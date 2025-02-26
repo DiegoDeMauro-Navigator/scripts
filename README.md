@@ -50,4 +50,5 @@ IMPORTANTE IMPORTANTE IMPORTANTE:
 No te ouvides sacar el drive si ejecuta el script en la session del usuario!!!!!!
 
 Get-PSDrive -PSProvider FileSystem | Where-Object {$_.DisplayRoot}
+
 Remove-PSDrive -Name Z -Force
