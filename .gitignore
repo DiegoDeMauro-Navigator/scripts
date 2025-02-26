@@ -4,3 +4,4 @@
 /terraform.tfstate
 /terraform.tfstate.backup
 /terraformbase.ps1
+/terraformbase.sh
