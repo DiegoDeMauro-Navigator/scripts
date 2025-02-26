@@ -1,4 +1,4 @@
 variable "subscription_id" {
-  description = "The subscription ID for the Azure account"
+  description = "El ID de suscripción para la cuenta de Azure"
   type        = string
 }
