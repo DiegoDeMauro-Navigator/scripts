@@ -3,7 +3,7 @@
 $storageAccountName = "storagefilesharepoc"
 $fileShareName = "fileshare-mount-poc"
 $mountPoint = "Z:"
-$clientId = "4ca52461-7446-4002-8748-ed10e0097979"  # Client ID da Managed Identity
+$clientId = "CLIENTID"  # Client ID da Managed Identity
 
 # Obter o token de acesso diretamente para o Storage
 try {
