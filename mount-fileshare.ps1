@@ -1,51 +1,55 @@
-# Script para montar Azure File Share usando directamente el token de la Managed Identity
-# Variables - ya llenadas con sus valores específicos
-$storageAccountName = "storagefilesharepoc"
-$fileShareName = "fileshare-mount-poc"
-$mountPoint = "Z:"
-$clientId = "CLIENTID"  # Client ID de la Managed Identity
 
-# Obtener el token de acceso directamente para el Storage
-try {
-    Write-Output "Obteniendo token para Azure Storage..."
-    $response = Invoke-RestMethod -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/&client_id=$clientId" -Method GET -Headers @{Metadata="true"} -ErrorAction Stop
-    $storageToken = $response.access_token
-    Write-Output "Token para Storage obtenido con éxito."
-} catch {
-    Write-Error "Fallo al obtener token para Storage: $_"
+$storageAccountName = "azjispstfsjauregui02"
+$fileShareName = "jauregui"
+$mountPoint = "Z:"
+$clientId = "4ca52461-7446-4002-8748-ed10e0097979"
+$subscriptionId = "9c4754a0-823e-468c-bc57-c6afee00b902"
+$resourceGroupName = "az-jis-p-rg-jauregui-01"
+
+# 1. Obter token para Azure Resource Manager
+Write-Output "Obtendo token para Azure Resource Manager..."
+$armToken = Invoke-RestMethod -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/&client_id=$clientId" -Method GET -Headers @{Metadata="true"}
+$armAccessToken = $armToken.access_token
+
+# 2. Obter chave da Storage Account
+Write-Output "Obtendo chave da Storage Account..."
+$url = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Storage/storageAccounts/$storageAccountName/listKeys?api-version=2019-06-01"
+$headers = @{
+    Authorization = "Bearer $armAccessToken"
+    "Content-Type" = "application/json"
+}
+$keysResponse = Invoke-RestMethod -Uri $url -Headers $headers -Method POST
+$storageKey = $keysResponse.keys[0].value
+Write-Output "Chave obtida com sucesso"
+
+# 3. Verificar se a porta SMB (445) está acessível
+$testConnection = Test-NetConnection -ComputerName "$storageAccountName.file.core.windows.net" -Port 445 -InformationLevel Quiet
+if (-not $testConnection) {
+    Write-Error "A porta 445 está bloqueada. Verifique as regras de firewall."
     exit 1
 }
 
-# Limpiar cualquier montaje previo
+# 4. Limpar qualquer montagem anterior
 if (Get-PSDrive -Name $mountPoint.TrimEnd(':') -ErrorAction SilentlyContinue) {
-    Write-Output "Eliminando montaje existente en $mountPoint..."
+    Write-Output "Removendo montagem existente em $mountPoint..."
     net use $mountPoint /delete /y
 }
 
-# Limpiar credenciales existentes
-Write-Output "Eliminando credenciales antiguas, si existen..."
+# 5. Configurar as credenciais no Windows Credential Manager
+Write-Output "Configurando credenciais..."
 cmdkey /delete:$storageAccountName.file.core.windows.net 2>&1 | Out-Null
+cmdkey /add:$storageAccountName.file.core.windows.net /user:Azure\$storageAccountName /pass:$storageKey
 
-# IMPORTANTE: Para montar con token OAuth/Azure AD, necesitamos usar el usuario "OAuth" en lugar de "Azure\storageAccountName"
-Write-Output "Añadiendo credenciales OAuth para el file share..."
-$cmdResult = cmd.exe /c "cmdkey /add:$storageAccountName.file.core.windows.net /user:OAuth /pass:$storageToken" 2>&1
-Write-Output "Resultado cmdkey: $cmdResult"
+# 6. Montar o File Share
+Write-Output "Montando o File Share..."
+net use $mountPoint "\\$storageAccountName.file.core.windows.net\$fileShareName" /persistent:yes
 
-# Mapear el file share a la letra de unidad
-Write-Output "Mapeando file share a la letra de unidad $mountPoint..."
-$mapResult = cmd.exe /c "net use $mountPoint \\$storageAccountName.file.core.windows.net\$fileShareName /persistent:yes" 2>&1
-Write-Output "Resultado net use: $mapResult"
-
-# Verificar el mapeo
+# 7. Verificar se a montagem foi bem-sucedida
 if (Test-Path -Path $mountPoint) {
-    Write-Output "Unidad $mountPoint mapeada con éxito!"
-    Write-Output "Contenido de la unidad:"
-    Get-ChildItem -Path $mountPoint
+    Write-Output "File Share montado com sucesso como $mountPoint"
+    # Listar os primeiros 5 itens
+    Get-ChildItem -Path $mountPoint | Select-Object -First 5
 } else {
-    Write-Error "Fallo al verificar el mapeo de la unidad. Verifique los errores anteriores."
-    Write-Output "NOTA: Para usar autenticación OAuth directa, verifique que:"
-    Write-Output "1. La cuenta de almacenamiento esté configurada para permitir autenticación vía Azure AD"
-    Write-Output "2. Azure AD Kerberos esté habilitado para esta cuenta de almacenamiento"
-    Write-Output "3. La Managed Identity tenga el rol 'Storage File Data SMB Share Contributor' (diferente de 'Storage Account Key Operator')"
+    Write-Error "Falha ao montar o File Share. Verifique a conta e as permissões."
     exit 1
 }
