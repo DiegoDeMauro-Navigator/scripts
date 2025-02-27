@@ -2,7 +2,7 @@
 $storageAccountName = "azjispstfsjauregui02"
 $fileShareName = "jauregui"
 $mountPoint = "Z:"
-$clientId = "4ca52461-7446-4002-8748-ed10e0097979"
+$clientId = "b4662711-3326-4ad1-b966-679a5ce4c0dc"
 $subscriptionId = "9c4754a0-823e-468c-bc57-c6afee00b902"
 $resourceGroupName = "az-jis-p-rg-jauregui-01"
 
